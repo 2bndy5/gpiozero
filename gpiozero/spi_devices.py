@@ -824,7 +824,7 @@ class NRF24L01(SPIDevice):
         elif isinstance(value, int):
             value = [0x20 | reg, value]
         # time.sleep(0.005)  # time for CSN to settle
-        buf = self._spi.write_readinto(value)
+        buf = self._spi.transfer(value)
         self._status = buf[0]  # save status byte
 
     @property
