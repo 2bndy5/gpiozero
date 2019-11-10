@@ -578,8 +578,8 @@ class MCP3304(MCP33xx):
             raise SPIBadChannel('channel must be between 0 and 7')
         super(MCP3304, self).__init__(channel, differential, max_voltage, **spi_args)
 
-# nRF24L01 registers
 class NRF24L01_REGISTERS:
+    """ nRF24L01 registers """
     # pylint: disable=bad-whitespace
     CONFIG     = 0x00 # register for configuring IRQ, CRC, PWR & RX/TX roles
     EN_AA      = 0x01 # register for auto-ACK feature. Each bit represents this feature per pipe
@@ -795,43 +795,37 @@ class NRF24L01(SPIDevice):
         self.close()
         return False
 
-    # pylint: disable=no-member
     def _reg_read(self, reg):
-        buf = bytearray(2)  # 2 = 1 status byte + 1 byte of returned content
-        with self._spi as spi:
-            time.sleep(0.005)  # time for CSN to settle
-            spi.readinto(buf, write_value=reg)
+        reg = [reg, 0]  # 1 status byte + 1 byte of returned content
+        # time.sleep(0.005)  # time for CSN to settle
+        buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
         return buf[1]  # drop status byte and return the rest
 
     def _reg_read_bytes(self, reg, buf_len=5):
-        # allow an extra byte for status data
-        buf = bytearray(buf_len + 1)
-        with self._spi as spi:
-            time.sleep(0.005)  # time for CSN to settle
-            spi.readinto(buf, write_value=reg)
+        reg = list(bytes([reg]) + bytes(buf_len))
+        # time.sleep(0.005)  # time for CSN to settle
+        buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
         return buf[1:]  # drop status byte and return the rest
 
     def _reg_write_bytes(self, reg, out_buf):
-        out_buf = bytes([0x20 | reg]) + out_buf
-        in_buf = bytearray(len(out_buf))
-        with self._spi as spi:
-            time.sleep(0.005)  # time for CSN to settle
-            spi.write_readinto(out_buf, in_buf)
-        self._status = in_buf[0]  # save status byte
+        if isinstance(out_buf, bytearray):
+            out_buf = list(bytes([0x20 | reg]) + out_buf)
+        elif isinstance(out_buf, list):
+            out_buf.insert(0, 0x20 | reg)
+        # time.sleep(0.005)  # time for CSN to settle
+        buf = self._spi.transfer(out_buf)
+        self._status = buf[0]  # save status byte
 
     def _reg_write(self, reg, value=None):
-        if value is None:
-            out_buf = bytes([reg])
-        else:
-            out_buf = bytes([0x20 | reg, value])
-        in_buf = bytearray(len(out_buf))
-        with self._spi as spi:
-            time.sleep(0.005)  # time for CSN to settle
-            spi.write_readinto(out_buf, in_buf)
-        self._status = in_buf[0]  # save status byte
-    # pylint: enable=no-member
+        if value is None: # only when writing non-operation command
+            value = [reg] # non-operation command is 0x00, so don't (0x20 | reg) here
+        elif isinstance(value, int):
+            value = [0x20 | reg, value]
+        # time.sleep(0.005)  # time for CSN to settle
+        buf = self._spi.write_readinto(value)
+        self._status = buf[0]  # save status byte
 
     @property
     def address_length(self):
