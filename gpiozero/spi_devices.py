@@ -797,14 +797,14 @@ class NRF24L01(SPIDevice):
     def _reg_read(self, reg):
         reg = [reg, 0]  # 1 status byte + 1 byte of returned content
         # time.sleep(0.005)  # time for CSN to settle
-        buf = self._spi.transfer(reg, select_settle=5)
+        buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
         return buf[1]  # drop status byte and return the rest
 
     def _reg_read_bytes(self, reg, buf_len=5):
         reg = list(bytes([reg]) + bytes(buf_len))
         # time.sleep(0.005)  # time for CSN to settle
-        buf = self._spi.transfer(reg, select_settle=5)
+        buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
         return bytearray(buf[1:])  # drop status byte and return the rest
 
@@ -814,7 +814,7 @@ class NRF24L01(SPIDevice):
         elif isinstance(out_buf, list):
             out_buf.insert(0, 0x20 | reg)
         # time.sleep(0.005)  # time for CSN to settle
-        buf = self._spi.transfer(out_buf, select_settle=5)
+        buf = self._spi.transfer(out_buf)
         self._status = buf[0]  # save status byte
 
     def _reg_write(self, reg, value=None):
@@ -823,7 +823,7 @@ class NRF24L01(SPIDevice):
         elif isinstance(value, int):
             value = [0x20 | reg, value]
         # time.sleep(0.005)  # time for CSN to settle
-        buf = self._spi.transfer(value, select_settle=5)
+        buf = self._spi.transfer(value)
         self._status = buf[0]  # save status byte
 
     @property
