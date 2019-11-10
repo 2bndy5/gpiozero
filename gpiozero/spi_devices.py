@@ -671,20 +671,6 @@ class NRF24L01(SPIDevice):
         # init the SPI bus and pins
         super(NRF24L01, self).__init__(shared=True, **spi_args)
 
-        # check for device presence by verifying nRF24L01 is in TX + standby-I mode
-        if self._reg_read(NRF24L01_REGISTERS.CONFIG) & 3 == 2: # if in TX + standby-I mode
-            self.power = False  # power down
-        else: # hardware presence check NOT passed
-            print(bin(self._reg_read(NRF24L01_REGISTERS.CONFIG)))
-            raise RuntimeError("nRF24L01 Hardware not responding")
-
-        # store the ce pin
-        self.ce_pin = OutputDevice(pin=ce_pin, pin_factory=self._spi.pin_factory)
-        # reset ce.value & disable the chip comms
-        self.ce_pin.value = False
-        # if radio is powered up and CE is LOW: standby-I mode
-        # if radio is powered up and CE is HIGH: standby-II mode
-
         # NOTE per spec sheet: nRF24L01+ must be in a standby or power down mode before writing
         # to the configuration register
         # configure the CONFIG register:IRQ(s) config, setup CRC feature, and trigger standby-I &
@@ -696,6 +682,20 @@ class NRF24L01(SPIDevice):
         else:
             raise ValueError(
                 "CRC byte length must be an int equal to 0 (off), 1, or 2")
+
+        # check for device presence by verifying nRF24L01 is in TX + standby-I mode
+        if self._reg_read(NRF24L01_REGISTERS.CONFIG) & 3 == 2: # if in TX + standby-I mode
+            self.power = False  # power down
+        else: # hardware presence check NOT passed
+            print(bin(self._reg_read(NRF24L01_REGISTERS.CONFIG)))
+            raise RuntimeError("nRF24L01 Hardware not responding")
+
+        # store the ce pin
+        self.ce_pin = OutputDevice(pin=ce_pin, pin_factory=self.pin_factory)
+        # reset ce.value & disable the chip comms
+        self.ce_pin.value = False
+        # if radio is powered up and CE is LOW: standby-I mode
+        # if radio is powered up and CE is HIGH: standby-II mode
 
         # configure the SETUP_RETR register
         if 250 <= ard <= 4000 and ard % 250 == 0 and 0 <= arc <= 15:
