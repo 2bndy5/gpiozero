@@ -778,7 +778,7 @@ class NRF24L01(SPIDevice):
         # time.sleep(0.005)  # time for CSN to settle
         buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
-        return buf[1:]  # drop status byte and return the rest
+        return bytearray(buf[1:])  # drop status byte and return the rest
 
     def _reg_write_bytes(self, reg, out_buf):
         if isinstance(out_buf, bytearray):
