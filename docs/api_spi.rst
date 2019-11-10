@@ -201,6 +201,68 @@ MCP3304
 .. autoclass:: MCP3304
     :members: channel, value, differential
 
+nRF24L01 Transceiver
+====================
+
+.. warning:: For successful transmissions, most of the endpoint trasceivers' settings/features must
+    match. These settings/features include:
+
+    * The RX pipe's address on the receiving nRF24L01 MUST match the TX pipe's address on the
+      transmitting nRF24L01
+    * `address_length`
+    * `channel`
+    * `data_rate`
+    * `dynamic_payloads`
+    * `payload_length` only when `dynamic_payloads` is disabled
+    * `auto_ack`
+    * custom `ack` payloads
+    * `crc`
+
+    In fact the only attributes that aren't required to match on both endpoint transceivers would
+    be the identifying data pipe number (passed to `open_rx_pipe()`), `pa_level`, `arc`, &
+    `ard` attributes. The ``ask_no_ack`` feature can be used despite the settings/features
+    configuration (see :meth:`~NRF24L01.send` & `write()` function
+    parameters for more details).
+
+Basic API
+---------
+
+.. autoclass:: NRF24L01
+    :members: address_length, open_tx_pipe, close_rx_pipe, open_rx_pipe, listen, any, recv, send
+
+Advanced API
+------------
+
+.. class:: NRF24L01
+
+    .. automethod:: what_happened
+    .. autoattribute:: dynamic_payloads
+    .. autoattribute:: payload_length
+    .. autoattribute:: auto_ack
+    .. autoattribute:: irq_dr
+    .. autoattribute:: irq_df
+    .. autoattribute:: irq_ds
+    .. automethod:: clear_status_flags
+    .. automethod:: interrupt_config
+    .. autoattribute:: ack
+    .. automethod:: load_ack
+    .. automethod:: read_ack
+    .. autoattribute:: data_rate
+    .. autoattribute:: channel
+    .. autoattribute:: crc
+    .. autoattribute:: power
+    .. autoattribute:: arc
+    .. autoattribute:: ard
+    .. autoattribute:: pa_level
+    .. autoattribute:: tx_full
+    .. automethod:: update
+    .. automethod:: resend
+    .. automethod:: write
+    .. automethod:: flush_rx
+    .. automethod:: flush_tx
+    .. automethod:: fifo
+    .. automethod:: pipe
+
 
 Base Classes
 ============
