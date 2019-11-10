@@ -69,6 +69,7 @@ from .spi_devices import (
     MCP3301,
     MCP3302,
     MCP3304,
+    NRF24L01,
 )
 from .output_devices import (
     OutputDevice,
