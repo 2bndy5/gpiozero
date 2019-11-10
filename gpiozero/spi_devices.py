@@ -618,9 +618,9 @@ class NRF24L01(SPIDevice):
     :param int address_length: This is the length (in bytes) of the addresses that are assigned to
         the data pipes for transmitting/receiving. Defaults to 5 and must be in range [3,5]. This
         can be changed at any time by using the `address_length` attribute.
-    :param int ard: This specifies the delay time (in µs) between attempts to automatically
+    :param int ard: This specifies the delay time (in microseconds) between attempts to automatically
         re-transmit. This can be changed at any time by using the `ard` attribute. This parameter
-        must be a multiple of 250 in the range [250,4000]. Defualts to 1500 µs.
+        must be a multiple of 250 in the range [250,4000]. Defualts to 1500 microseconds.
     :param int arc: This specifies the automatic re-transmit count (maximum number of automatically
         attempts to re-transmit). This can be changed at any time by using the `arc` attribute.
         This parameter must be in the range [0,15]. Defaults to 3.
@@ -791,8 +791,7 @@ class NRF24L01(SPIDevice):
         return self
 
     def __exit__(self, *exc):
-        self.ce_pin.close()
-        self.close()
+        self.power = 0
         return False
 
     def _reg_read(self, reg):
@@ -1013,8 +1012,8 @@ class NRF24L01(SPIDevice):
         self.clear_status_flags(True, False, False) # only Data Ready flag
 
         # enable radio comms
-        self.ce_pin.value = 1 # radio begins listening after CE pulse is > 130 µs
-        time.sleep(0.00013) # ensure pulse is > 130 µs
+        self.ce_pin.value = 1 # radio begins listening after CE pulse is > 130 microseconds
+        time.sleep(0.00013) # ensure pulse is > 130 microseconds
         # nRF24L01 has just entered active RX + standby-II mode
 
     def _stop_listening(self):
@@ -1147,7 +1146,7 @@ class NRF24L01(SPIDevice):
         # T_download == T_upload, however RX devices spi settings must match TX's for
         # accurate calc
 
-        # let 2 * stby2active (in µs) ~= (2 + 1 if getting ack else 0) * 130
+        # let 2 * stby2active (in microseconds) ~= (2 + 1 if getting ack else 0) * 130
 
         # let T_ack = T_overAir as the payload size is the only distictive variable between
         # the 2
@@ -1207,7 +1206,7 @@ class NRF24L01(SPIDevice):
         timeout = pl_coef * (((8 * (len(buf) + pl_len)) + 9) /
                              bitrate) + stby2active + t_irq + t_retry
         self.write(buf, ask_no_ack)  # init using non-blocking helper
-        time.sleep(0.00001)  # ensure CE pulse is >= 10 µs
+        time.sleep(0.00001)  # ensure CE pulse is >= 10 microseconds
         # if pulse is stopped here, the nRF24L01 only handles the top level payload in the FIFO.
         # hold CE HIGH to continue processing through the rest of the TX FIFO bound for the
         # address passed to open_tx_pipe()
@@ -1694,7 +1693,7 @@ class NRF24L01(SPIDevice):
           still be accessed through SPI. Upon instantiation, this driver class puts the nRF24L01
           to sleep until the MCU invokes RX/TX transmissions. This driver class doesn't power down
           the nRF24L01 after RX/TX transmissions are complete (avoiding the required power up/down
-          130 µs wait time), that preference is left to the user.
+          130 microseconds wait time), that preference is left to the user.
         - `True` powers up the nRF24L01. This is the first step towards entering RX/TX modes (see
           also `listen` attribute). Powering up is automatically handled by the `listen` attribute
           as well as the `send()` and `write()` functions.
@@ -1720,7 +1719,7 @@ class NRF24L01(SPIDevice):
             self._config = (self._config & 0x7d) | (
                 is_on << 1)  # doesn't affect TX?RX mode
             self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
-            # power up/down takes < 150 µs + 4 µs
+            # power up/down takes < 150 microseconds + 4 microseconds
             time.sleep(0.00016)
 
     @property
@@ -1748,7 +1747,7 @@ class NRF24L01(SPIDevice):
 
     @property
     def ard(self):
-        """This `int` attribute specifies the nRF24L01's delay (in µs) between attempts to
+        """This `int` attribute specifies the nRF24L01's delay (in microseconds) between attempts to
         automatically re-transmit the TX payload when an expected acknowledgement (ACK) packet is
         not received. During this time, the nRF24L01 is listening for the ACK packet. If the
         `auto_ack` attribute is disabled, this attribute is not applied.
@@ -1862,7 +1861,7 @@ class NRF24L01(SPIDevice):
             # cycle the CE pin to re-enable transmission of re-used payload
             self.ce_pin.value = 0
             self.ce_pin.value = 1
-            time.sleep(0.00001)  # mandated 10 µs pulse
+            time.sleep(0.00001)  # mandated 10 microseconds pulse
             # now get result
             self.ce_pin.value = 0  # only send one payload
             start = time.monotonic()
@@ -1924,11 +1923,11 @@ class NRF24L01(SPIDevice):
         This function isn't completely non-blocking as we still need to wait just under 5 ms for
         the CSN pin to settle (allowing a clean SPI transaction).
 
-        .. note:: The nRF24L01 doesn't initiate sending until a mandatory minimum 10 µs pulse on
+        .. note:: The nRF24L01 doesn't initiate sending until a mandatory minimum 10 microseconds pulse on
             the CE pin is acheived. That pulse is initiated before this function exits. However, we
-            have left that 10 µs wait time to be managed by the MCU in cases of asychronous
+            have left that 10 microseconds wait time to be managed by the MCU in cases of asychronous
             application, or it is managed by using `send()` instead of this function. If the CE pin
-            remains HIGH for longer than 10 µs, then the nRF24L01 will continue to transmit all
+            remains HIGH for longer than 10 microseconds, then the nRF24L01 will continue to transmit all
             payloads found in the TX FIFO buffer.
 
         .. warning:: A note paraphrased from the `nRF24L01+ Specifications Sheet <https://www.
@@ -1961,7 +1960,7 @@ class NRF24L01(SPIDevice):
             # also ensures tx mode
             self._config = (self._reg_read(NRF24L01_REGISTERS.CONFIG) & 0x7c) | 2
             self._reg_write(0, self._config)
-            # power up/down takes < 150 µs + 4 µs
+            # power up/down takes < 150 microseconds + 4 microseconds
             time.sleep(0.00016)
 
         # pad out or truncate data to fill payload_length if dynamic_payloads == False
@@ -1984,7 +1983,7 @@ class NRF24L01(SPIDevice):
             # write appropriate command with payload
             self._reg_write_bytes(0xA0, buf)
             # print("payload does want acknowledgment")
-        # enable radio comms so it can send the data by starting the mandatory minimum 10 µs pulse
+        # enable radio comms so it can send the data by starting the mandatory minimum 10 microseconds pulse
         # on CE. Let send() measure this pulse for blocking reasons
         self.ce_pin.value = 1  # re-used payloads start with this as well
         # radio will automatically go to standby-II after transmission while CE is still HIGH only
