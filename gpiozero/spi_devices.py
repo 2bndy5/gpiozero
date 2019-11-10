@@ -18,7 +18,8 @@ except ImportError:
     pass # py2's reduce is built-in
 
 from .exc import DeviceClosed, SPIBadChannel, InputDeviceError
-from .devices import Device, GPIODevice
+from .devices import Device
+from .output_devices import OutputDevice
 
 
 class SPIDevice(Device):
@@ -671,7 +672,7 @@ class NRF24L01(SPIDevice):
         super(NRF24L01, self).__init__(shared=True, **spi_args)
 
         # store the ce pin
-        self.ce_pin = GPIODevice(pin=ce_pin, pin_factory=self._spi.pin_factory)
+        self.ce_pin = OutputDevice(pin=ce_pin, pin_factory=self._spi.pin_factory)
         # reset ce.value & disable the chip comms
         self.ce_pin.value = False
         # if radio is powered up and CE is LOW: standby-I mode
