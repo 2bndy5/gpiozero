@@ -7,7 +7,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import operator
-import time
 from threading import RLock
 
 from . import SPI
@@ -181,7 +180,7 @@ class SPISoftwareBus(SharedMixin, Device):
     def _shared_key(cls, clock_pin, mosi_pin, miso_pin, *, pin_factory=None):
         return (clock_pin, mosi_pin, miso_pin)
 
-    def transfer(self, data, clock_phase=False, lsb_first=False, bits_per_word=8, select_settle=0):
+    def transfer(self, data, clock_phase=False, lsb_first=False, bits_per_word=8):
         """
         Writes data (a list of integer words where each word is assumed to have
         :attr:`bits_per_word` bits or less) to the SPI interface, and reads an
@@ -194,7 +193,6 @@ class SPISoftwareBus(SharedMixin, Device):
             # protocol") for a simpler C implementation of this which ignores
             # clock polarity, phase, variable word-size, and multiple input
             # words
-            time.sleep(select_settle / 1000)
             if lsb_first:
                 shift = operator.lshift
                 init_mask = 1
