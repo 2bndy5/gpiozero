@@ -712,10 +712,11 @@ class NRF24L01(SPIDevice):
                 "CRC byte length must be an int equal to 0 (off), 1, or 2")
 
         # check for device presence by verifying nRF24L01 is in TX + standby-I mode
-        if self._reg_read(NRF24L01_REGISTERS.CONFIG) & 3 == 2: # if in TX + standby-I mode
+        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG)
+        if self._config & 3 == 2: # if in TX + standby-I mode
             self.power = False  # power down
         else: # hardware presence check NOT passed
-            print(bin(self._reg_read(NRF24L01_REGISTERS.CONFIG)))
+            print(bin(self._config))
             raise RuntimeError("nRF24L01 Hardware not responding")
 
         # store the ce pin
