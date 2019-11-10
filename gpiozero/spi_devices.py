@@ -671,6 +671,13 @@ class NRF24L01(SPIDevice):
         # init the SPI bus and pins
         super(NRF24L01, self).__init__(shared=True, **spi_args)
 
+        # check for device presence by verifying nRF24L01 is in TX + standby-I mode
+        if self._reg_read(NRF24L01_REGISTERS.CONFIG) & 3 == 2: # if in TX + standby-I mode
+            self.power = False  # power down
+        else: # hardware presence check NOT passed
+            print(bin(self._reg_read(NRF24L01_REGISTERS.CONFIG)))
+            raise RuntimeError("nRF24L01 Hardware not responding")
+
         # store the ce pin
         self.ce_pin = OutputDevice(pin=ce_pin, pin_factory=self._spi.pin_factory)
         # reset ce.value & disable the chip comms
@@ -689,13 +696,6 @@ class NRF24L01(SPIDevice):
         else:
             raise ValueError(
                 "CRC byte length must be an int equal to 0 (off), 1, or 2")
-
-        # check for device presence by verifying nRF24L01 is in TX + standby-I mode
-        if self._reg_read(NRF24L01_REGISTERS.CONFIG) & 3 == 2: # if in TX + standby-I mode
-            self.power = False  # power down
-        else: # hardware presence check NOT passed
-            print(bin(self._reg_read(NRF24L01_REGISTERS.CONFIG)))
-            raise RuntimeError("nRF24L01 Hardware not responding")
 
         # configure the SETUP_RETR register
         if 250 <= ard <= 4000 and ard % 250 == 0 and 0 <= arc <= 15:
@@ -768,14 +768,16 @@ class NRF24L01(SPIDevice):
 
     def _reg_read(self, reg):
         reg = [reg, 0]  # 1 status byte + 1 byte of returned content
-        # time.sleep(0.005)  # time for CSN to settle
+        self._spi.select_pin.value = 0
+        time.sleep(0.005)  # time for CSN to settle
         buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
         return buf[1]  # drop status byte and return the rest
 
     def _reg_read_bytes(self, reg, buf_len=5):
         reg = list(bytes([reg]) + bytes(buf_len))
-        # time.sleep(0.005)  # time for CSN to settle
+        self._spi.select_pin.value = 0
+        time.sleep(0.005)  # time for CSN to settle
         buf = self._spi.transfer(reg)
         self._status = buf[0]  # save status byte
         return bytearray(buf[1:])  # drop status byte and return the rest
@@ -785,7 +787,8 @@ class NRF24L01(SPIDevice):
             out_buf = list(bytes([0x20 | reg]) + out_buf)
         elif isinstance(out_buf, list):
             out_buf.insert(0, 0x20 | reg)
-        # time.sleep(0.005)  # time for CSN to settle
+        self._spi.select_pin.value = 0
+        time.sleep(0.005)  # time for CSN to settle
         buf = self._spi.transfer(out_buf)
         self._status = buf[0]  # save status byte
 
@@ -794,7 +797,8 @@ class NRF24L01(SPIDevice):
             value = [reg] # non-operation command is 0x00, so don't (0x20 | reg) here
         elif isinstance(value, int):
             value = [0x20 | reg, value]
-        # time.sleep(0.005)  # time for CSN to settle
+        self._spi.select_pin.value = 0
+        time.sleep(0.005)  # time for CSN to settle
         buf = self._spi.transfer(value)
         self._status = buf[0]  # save status byte
 
