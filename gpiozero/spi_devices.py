@@ -1758,9 +1758,9 @@ class NRF24L01(SPIDevice):
         .. note:: Paraphrased from nRF24L01 specifications sheet:
 
             Please take care when setting this parameter. If the custom ACK payload is more than 15
-            bytes in 2 Mbps data rate, the `ard` must be 500µS or more. If the custom ACK payload
-            is more than 5 bytes in 1 Mbps data rate, the `ard` must be 500µS or more. In 250kbps
-            data rate (even when there is no custom ACK payload) the `ard` must be 500µS or more.
+            bytes in 2 Mbps data rate, the `ard` must be 500 microseconds or more. If the custom ACK payload
+            is more than 5 bytes in 1 Mbps data rate, the `ard` must be 500 microseconds or more. In 250kbps
+            data rate (even when there is no custom ACK payload) the `ard` must be 500 microseconds or more.
 
             See `data_rate` attribute on how to set the data rate of the nRF24L01's transmissions.
         """
