@@ -690,7 +690,7 @@ class NRF24L01(SPIDevice):
         return bytearray(buf[1:])  # drop status byte and return the rest
 
     def _reg_write_bytes(self, reg, out_buf):
-        if isinstance(out_buf, bytearray):
+        if isinstance(out_buf, (bytes, bytearray)):
             out_buf = list(bytes([0x20 | reg]) + out_buf)
         elif isinstance(out_buf, list):
             out_buf.insert(0, 0x20 | reg)
