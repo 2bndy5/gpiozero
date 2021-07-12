@@ -597,15 +597,16 @@ class NRF24L01(SPIDevice):
                 "{}".format(hex(self._config), hex(hw_check))
             )
 
-        for i in range(6):  # capture RX addresses from registers
+        # capture RX addresses from registers
+        for i in range(6):
             if i < 2:
                 self._pipes[i] = self._reg_read_bytes(NRF24L01_REGISTERS.RX_ADDR + i)
             else:
                 self._pipes[i] = self._reg_read(NRF24L01_REGISTERS.RX_ADDR + i)
 
-        # store the ce pin
+        #: This attribute controls the nRF24L01's the CE pin (for advanced users).
         self.ce_pin = OutputDevice(pin=ce_pin, pin_factory=self.pin_factory)
-        # reset ce.value & disable the chip comms
+        # reset ce_pin.value & disable the chip comms
         self.ce_pin.value = False
         # if radio is powered up and CE is LOW: standby-I mode
         # if radio is powered up and CE is HIGH: standby-II mode
@@ -620,6 +621,7 @@ class NRF24L01(SPIDevice):
             self._is_plus_variant = True
         elif not after_toggle:  # if features are disabled
             self._reg_write(0x50, 0x73)  # ensure they're enabled
+
         # pre-configure features for TX operations:
         #   5 = enable dynamic_payloads, disable custom ack payloads, &
         #       allow ask_no_ack command
@@ -639,18 +641,9 @@ class NRF24L01(SPIDevice):
         self._addr_len = 5  # 5-byte long addresses
         self._pl_len = [32] * 6  # 32-byte static payloads for all pipes
 
-        with self:  # write to registers & power up
-            # using __enter__() configures all virtual features and settings to the hardware
-            # registers
-            self.flush_rx()
-            self.flush_tx()
-            self.clear_status_flags()
-
-    def __enter__(self):
         self.ce_pin.value = 0  # ensure standby-I mode to write to CONFIG register
         self._config |= 2
         self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
-        # time.sleep(0.00015)  # let the rest of this function be the delay
         self._reg_write(NRF24L01_REGISTERS.RF_SETUP, self._rf_setup)
         self._reg_write(NRF24L01_REGISTERS.EN_RX, self._open_pipes)
         self._reg_write(NRF24L01_REGISTERS.DYNPD, self._dyn_pl)
@@ -666,14 +659,15 @@ class NRF24L01(SPIDevice):
         self._reg_write_bytes(NRF24L01_REGISTERS.TX_ADDR, self._tx_address)
         self._reg_write(NRF24L01_REGISTERS.RF_CH, self._channel)
         self._reg_write(NRF24L01_REGISTERS.SETUP_AW, self._addr_len - 2)
-        return self
+        self.flush_rx()
+        self.flush_tx()
+        self.clear_status_flags()
 
     def __exit__(self, *exc):
         self.ce_pin.value = 0  # ensure standby-I mode to write to CONFIG register
         self._config &= 0x7D  # power off radio
         self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
-        time.sleep(0.00016)
-        return False
+        return super().__exit__(*exc)
 
     def _reg_read(self, reg):
         reg = [reg, 0]  # 1 status byte + 1 byte of returned content
@@ -764,7 +758,7 @@ class NRF24L01(SPIDevice):
 
     @property
     def listen(self):
-        """An attribute to represent the nRF24L01 primary role as a radio."""
+        """An attribute to represent the nRF24L01 primary role (RX or TX) as a radio."""
         return self.power and bool(self._config & 1)
 
     @listen.setter
@@ -802,7 +796,8 @@ class NRF24L01(SPIDevice):
         return self.update() and self._status >> 1 & 7 < 6
 
     def any(self):
-        """This function checks if the nRF24L01 has received any data at all."""
+        """This function returns the length of the next available payload from the RX
+        FIFO (if any at at all)."""
         if self.available():
             if self._features & 4:
                 return self._reg_read(0x60)
@@ -811,7 +806,7 @@ class NRF24L01(SPIDevice):
 
     def read(self, length=None):
         """This function is used to retrieve the next available payload in the RX FIFO buffer, then
-        clears the `irq_dr` status flag."""
+        clears the :attr:`irq_dr` status flag."""
         return_size = length if length is not None else self.any()
         if not return_size:
             return None
@@ -1124,7 +1119,7 @@ class NRF24L01(SPIDevice):
 
     @property
     def arc(self):
-        """"This `int` attribute specifies the nRF24L01's number of attempts to re-transmit TX
+        """This `int` attribute specifies the nRF24L01's number of attempts to re-transmit TX
         payload when acknowledgment packet is not received."""
         self._retry_setup = self._reg_read(NRF24L01_REGISTERS.SETUP_RETR)
         return self._retry_setup & 0x0F
@@ -1150,13 +1145,13 @@ class NRF24L01(SPIDevice):
         self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
 
     def set_auto_retries(self, delay, count):
-        """set the `ard` & `arc` attributes with 1 function."""
+        """Set the :attr:`ard` & :attr:`arc` attributes with 1 function."""
         delay = int((max(250, min(delay, 4000)) - 250) / 250) << 4
         self._retry_setup = delay | max(0, min(int(count), 15))
         self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
 
     def get_auto_retries(self):
-        """get the `ard` & `arc` attributes with 1 function."""
+        """Get the :attr:`ard` & :attr:`arc` attributes with 1 function."""
         return (self.ard, self._retry_setup & 0x0F)
 
     @property
@@ -1187,7 +1182,7 @@ class NRF24L01(SPIDevice):
         self._reg_write(NRF24L01_REGISTERS.EN_AA, self._aa)
 
     def set_auto_ack(self, enable, pipe_number):
-        """Control the `auto_ack` feature for a specific data pipe."""
+        """Control the :attr:`auto_ack` feature for a specific data pipe."""
         if pipe_number is None:
             self.auto_ack = bool(enable)
         elif 0 <= pipe_number <= 5:
@@ -1197,7 +1192,7 @@ class NRF24L01(SPIDevice):
             raise IndexError("pipe_number must be in range [0, 5]")
 
     def get_auto_ack(self, pipe_number):
-        """Returns a `bool` describing the `auto_ack` feature about a data pipe."""
+        """Returns a `bool` describing the :attr:`auto_ack` feature about a data pipe."""
         if 0 <= pipe_number <= 5:
             self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
             return bool(self._aa & (1 << pipe_number))
@@ -1238,7 +1233,7 @@ class NRF24L01(SPIDevice):
 
     @property
     def allow_ask_no_ack(self):
-        """Allow or disable ``ask_no_ack`` parameter to `send()` & `write()`."""
+        """Allow or disable ``ask_no_ack`` parameter to :meth:`send()` & :meth:`write()`."""
         self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE)
         return bool(self._features & 1)
 
@@ -1359,9 +1354,9 @@ class NRF24L01(SPIDevice):
         return result
 
     def write(self, buf=None, ask_no_ack=False, write_only=False):
-        """This non-blocking function (when used as alternative to `send()`) is meant for
+        """This non-blocking function (when used as alternative to :meth:`send()`) is meant for
         asynchronous applications and can only handle one payload at a time as it is a helper
-        function to `send()`."""
+        function to :meth:`send()`."""
         if not buf or len(buf) > 32:
             raise ValueError("buffer must have a length in range [1, 32]")
         self.clear_status_flags()
