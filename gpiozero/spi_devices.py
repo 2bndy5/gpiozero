@@ -583,10 +583,6 @@ class NRF24L01(SPIDevice):
     """
     def __init__(self, ce_pin,
                  **spi_args):
-        self._payload_length = 32  # inits internal attribute
-        self.payload_length = self._payload_length
-        # last address assigned to pipe0 for reading. init to None
-        self._fifo = 0
         self._status = 0
         # init shadow copy of RX addresses for all pipes for context manager
         self._pipes = [
@@ -605,12 +601,13 @@ class NRF24L01(SPIDevice):
         # init the SPI bus and pins
         super(NRF24L01, self).__init__(shared=True, **spi_args)
         # check for device presence by verifying nRF24L01 is in TX + standby-I mode
-        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG)
-        if self._config & 3 == 2: # if in TX + standby-I mode
-            self.power = False  # power down
-        else: # hardware presence check NOT passed
-            print(bin(self._config))
-            raise RuntimeError("nRF24L01 Hardware not responding")
+        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+        hw_check = self._reg_read(NRF24L01_REGISTERS.CONFIG)
+        if hw_check != self._config:
+            raise RuntimeError(
+                "nRF24L01 Hardware not responding; expected {}, got "
+                "{}".format(hex(self._config), hex(hw_check))
+            )
 
         for i in range(6):  # capture RX addresses from registers
             if i < 2:
@@ -657,13 +654,9 @@ class NRF24L01(SPIDevice):
         with self:  # write to registers & power up
             # using __enter__() configures all virtual features and settings to the hardware
             # registers
-            self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config | 1)  # enable RX mode
-            time.sleep(0.000015)  # wait time for transitioning modes RX/TX
-            self.flush_rx()  # spec sheet say "used in RX mode"
-            self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config & 0xC)  # power down + TX mode
-            time.sleep(0.000015)  # wait time for transitioning modes RX/TX
-            self.flush_tx()  # spec sheet say "used in TX mode"
-            self.clear_status_flags()  # writes directly to STATUS register
+            self.flush_rx()
+            self.flush_tx()
+            self.clear_status_flags()
 
     def __enter__(self):
         self.ce_pin.value = 0  # ensure standby-I mode to write to CONFIG register
