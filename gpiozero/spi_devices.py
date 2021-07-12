@@ -581,8 +581,7 @@ class NRF24L01(SPIDevice):
     :param ce_pin: The digital output pin that is connected to the nRF24L01's CE (Chip Enable) pin.
         This is required.
     """
-    def __init__(self, ce_pin,
-                 **spi_args):
+    def __init__(self, ce_pin, **spi_args):
         self._status = 0
         # init shadow copy of RX addresses for all pipes for context manager
         self._pipes = [
@@ -1333,14 +1332,14 @@ class NRF24L01(SPIDevice):
             else:
                 self._pipes[i] = self._reg_read(NRF24L01_REGISTERS.RX_ADDR + i)
             self._pl_len[i] = self._reg_read(NRF24L01_REGISTERS.RX_PW + i)
-        print("TX address____________ 0x" + self.address())
+        print("TX address____________ 0x" + repr(self.address()))
         for i in range(6):
             is_open = self._open_pipes & (1 << i)
             print(
                 "Pipe {} ({}) bound: {}".format(
                     i,
                     " open " if is_open else "closed",
-                    "0x" + self.address(i),
+                    "0x" + repr(self.address(i)),
                 )
             )
             if is_open and not self._dyn_pl & (1 << i):
