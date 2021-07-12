@@ -550,24 +550,6 @@ class MCP3304(MCP33xx):
         super(MCP3304, self).__init__(channel, differential, max_voltage, **spi_args)
 
 
-class NRF24L01_REGISTERS:
-    """ nRF24L01 registers """
-
-    CONFIG     = 0x00 # register for configuring IRQ, CRC, PWR & RX/TX roles
-    EN_AA      = 0x01 # register for auto-ACK feature. Each bit represents this feature per pipe
-    EN_RX      = 0x02 # register to open/close pipes. Each bit represents this feature per pipe
-    SETUP_AW   = 0x03 # address width register
-    SETUP_RETR = 0x04 # auto-retry count and auto-retry delay register
-    RF_CH      = 0x05 # channel register
-    RF_SETUP   = 0x06 # RF Power Amplifier & Data Rate
-    RX_ADDR    = 0x0a # RX pipe addresses == [0,5]:[0x0A:0x0F]
-    RX_PW      = 0x11 # RX payload widths on pipes == [0,5]:[0x11,0x16]
-    FIFO       = 0x17 # register containing info on both RX/TX FIFOs + re-use payload flag
-    DYNPD      = 0x1c # dynamic payloads feature. Each bit represents this feature per pipe
-    FEATURE    = 0x1d # global flags for dynamic payloads, custom ACK payloads, & Ask no ACK
-    TX_ADDR    = 0x10 # Address that is used for TX transmissions
-
-
 class NRF24L01(SPIDevice):
     """A driver class for the nRF24L01(+) transceiver radios."""
     def __init__(self, ce_pin, **spi_args):
@@ -589,8 +571,8 @@ class NRF24L01(SPIDevice):
         # init the SPI bus and pins
         super(NRF24L01, self).__init__(shared=True, **spi_args)
         # check for device presence by verifying nRF24L01 is in TX + standby-I mode
-        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
-        hw_check = self._reg_read(NRF24L01_REGISTERS.CONFIG)
+        self._reg_write(self.CONFIG, self._config)
+        hw_check = self._reg_read(self.CONFIG)
         if hw_check != self._config:
             raise RuntimeError(
                 "nRF24L01 Hardware not responding; expected {}, got "
@@ -600,9 +582,9 @@ class NRF24L01(SPIDevice):
         # capture RX addresses from registers
         for i in range(6):
             if i < 2:
-                self._pipes[i] = self._reg_read_bytes(NRF24L01_REGISTERS.RX_ADDR + i)
+                self._pipes[i] = self._reg_read_bytes(self.RX_ADDR + i)
             else:
-                self._pipes[i] = self._reg_read(NRF24L01_REGISTERS.RX_ADDR + i)
+                self._pipes[i] = self._reg_read(self.RX_ADDR + i)
 
         #: This attribute controls the nRF24L01's the CE pin (for advanced users).
         self.ce_pin = OutputDevice(pin=ce_pin, pin_factory=self.pin_factory)
@@ -614,9 +596,9 @@ class NRF24L01(SPIDevice):
         # test is nRF24L01 is a plus variant using a command specific to
         # non-plus variants
         self._open_pipes, self._is_plus_variant = (0, False)  # close all RX pipes
-        self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE)
+        self._features = self._reg_read(self.FEATURE)
         self._reg_write(0x50, 0x73)  # derelict command toggles FEATURE register
-        after_toggle = self._reg_read(NRF24L01_REGISTERS.FEATURE)
+        after_toggle = self._reg_read(self.FEATURE)
         if self._features == after_toggle:
             self._is_plus_variant = True
         elif not after_toggle:  # if features are disabled
@@ -630,7 +612,7 @@ class NRF24L01(SPIDevice):
         # open_tx_pipe() appropriates pipe 0 for ACK packet
         self._pipe0_read_addr = None
         # shadow copy of the TX_ADDRESS
-        self._tx_address = self._reg_read_bytes(NRF24L01_REGISTERS.TX_ADDR)
+        self._tx_address = self._reg_read_bytes(self.TX_ADDR)
         # pre-configure the SETUP_RETR register
         self._retry_setup = 0x5F  # ard = 1500; arc = 15
         # pre-configure the RF_SETUP register
@@ -643,30 +625,45 @@ class NRF24L01(SPIDevice):
 
         self.ce_pin.value = 0  # ensure standby-I mode to write to CONFIG register
         self._config |= 2
-        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
-        self._reg_write(NRF24L01_REGISTERS.RF_SETUP, self._rf_setup)
-        self._reg_write(NRF24L01_REGISTERS.EN_RX, self._open_pipes)
-        self._reg_write(NRF24L01_REGISTERS.DYNPD, self._dyn_pl)
-        self._reg_write(NRF24L01_REGISTERS.EN_AA, self._aa)
-        self._reg_write(NRF24L01_REGISTERS.FEATURE, self._features)
-        self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
+        self._reg_write(self.CONFIG, self._config)
+        self._reg_write(self.RF_SETUP, self._rf_setup)
+        self._reg_write(self.EN_RX, self._open_pipes)
+        self._reg_write(self.DYNPD, self._dyn_pl)
+        self._reg_write(self.EN_AA, self._aa)
+        self._reg_write(self.FEATURE, self._features)
+        self._reg_write(self.SETUP_RETR, self._retry_setup)
         for i, addr in enumerate(self._pipes):
             if i < 2:
-                self._reg_write_bytes(NRF24L01_REGISTERS.RX_ADDR + i, addr)
+                self._reg_write_bytes(self.RX_ADDR + i, addr)
             else:
-                self._reg_write(NRF24L01_REGISTERS.RX_ADDR + i, addr)
+                self._reg_write(self.RX_ADDR + i, addr)
             self.set_payload_length(self._pl_len[i], i)
-        self._reg_write_bytes(NRF24L01_REGISTERS.TX_ADDR, self._tx_address)
-        self._reg_write(NRF24L01_REGISTERS.RF_CH, self._channel)
-        self._reg_write(NRF24L01_REGISTERS.SETUP_AW, self._addr_len - 2)
+        self._reg_write_bytes(self.TX_ADDR, self._tx_address)
+        self._reg_write(self.RF_CH, self._channel)
+        self._reg_write(self.SETUP_AW, self._addr_len - 2)
         self.flush_rx()
         self.flush_tx()
         self.clear_status_flags()
 
+    # nRF24L01 registers
+    CONFIG     = 0x00 # register for configuring IRQ, CRC, PWR & RX/TX roles
+    EN_AA      = 0x01 # register for auto-ACK feature. Each bit represents this feature per pipe
+    EN_RX      = 0x02 # register to open/close pipes. Each bit represents this feature per pipe
+    SETUP_AW   = 0x03 # address width register
+    SETUP_RETR = 0x04 # auto-retry count and auto-retry delay register
+    RF_CH      = 0x05 # channel register
+    RF_SETUP   = 0x06 # RF Power Amplifier & Data Rate
+    RX_ADDR    = 0x0a # RX pipe addresses == [0,5]:[0x0A:0x0F]
+    RX_PW      = 0x11 # RX payload widths on pipes == [0,5]:[0x11,0x16]
+    FIFO       = 0x17 # register containing info on both RX/TX FIFOs + re-use payload flag
+    DYNPD      = 0x1c # dynamic payloads feature. Each bit represents this feature per pipe
+    FEATURE    = 0x1d # global flags for dynamic payloads, custom ACK payloads, & Ask no ACK
+    TX_ADDR    = 0x10 # Address that is used for TX transmissions
+
     def __exit__(self, *exc):
         self.ce_pin.value = 0  # ensure standby-I mode to write to CONFIG register
         self._config &= 0x7D  # power off radio
-        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+        self._reg_write(self.CONFIG, self._config)
         return super().__exit__(*exc)
 
     def _reg_read(self, reg):
@@ -704,7 +701,7 @@ class NRF24L01(SPIDevice):
     @property
     def address_length(self):
         """This `int` attribute specifies the length (in bytes) of addresses."""
-        self._addr_len = self._reg_read(NRF24L01_REGISTERS.SETUP_AW) + 2
+        self._addr_len = self._reg_read(self.SETUP_AW) + 2
         return self._addr_len
 
     @address_length.setter
@@ -712,7 +709,7 @@ class NRF24L01(SPIDevice):
         if not 3 <= length <= 5:
             raise ValueError("address_length can only be set in range [3, 5] bytes")
         self._addr_len = int(length)
-        self._reg_write(NRF24L01_REGISTERS.SETUP_AW, length - 2)
+        self._reg_write(self.SETUP_AW, length - 2)
 
     def open_tx_pipe(self, address):
         """This function is used to open a data pipe for OTA (over the air) TX
@@ -720,22 +717,22 @@ class NRF24L01(SPIDevice):
         if self._aa & 1:
             for i, val in enumerate(address):
                 self._pipes[0][i] = val
-            self._reg_write_bytes(NRF24L01_REGISTERS.RX_ADDR, address)
+            self._reg_write_bytes(self.RX_ADDR, address)
         for i, val in enumerate(address):
             self._tx_address[i] = val
-        self._reg_write_bytes(NRF24L01_REGISTERS.TX_ADDR, address)
+        self._reg_write_bytes(self.TX_ADDR, address)
 
     def close_rx_pipe(self, pipe_number):
         """This function is used to close a specific data pipe from OTA (over the air) RX
         transmissions."""
         if pipe_number < 0 or pipe_number > 5:
             raise IndexError("pipe number must be in range [0, 5]")
-        self._open_pipes = self._reg_read(NRF24L01_REGISTERS.EN_RX)
+        self._open_pipes = self._reg_read(self.EN_RX)
         if not pipe_number:
             self._pipe0_read_addr = None
         if self._open_pipes & (1 << pipe_number):
             self._open_pipes = self._open_pipes & ~(1 << pipe_number)
-            self._reg_write(NRF24L01_REGISTERS.EN_RX, self._open_pipes)
+            self._reg_write(self.EN_RX, self._open_pipes)
 
     def open_rx_pipe(self, pipe_number, address):
         """This function is used to open a specific data pipe for OTA (over the air) RX
@@ -749,12 +746,12 @@ class NRF24L01(SPIDevice):
                 self._pipe0_read_addr = address
             for i, val in enumerate(address):
                 self._pipes[pipe_number][i] = val
-            self._reg_write_bytes(NRF24L01_REGISTERS.RX_ADDR + pipe_number, address)
+            self._reg_write_bytes(self.RX_ADDR + pipe_number, address)
         else:
             self._pipes[pipe_number] = address[0]
-            self._reg_write(NRF24L01_REGISTERS.RX_ADDR + pipe_number, address[0])
-        self._open_pipes = self._reg_read(NRF24L01_REGISTERS.EN_RX) | (1 << pipe_number)
-        self._reg_write(NRF24L01_REGISTERS.EN_RX, self._open_pipes)
+            self._reg_write(self.RX_ADDR + pipe_number, address[0])
+        self._open_pipes = self._reg_read(self.EN_RX) | (1 << pipe_number)
+        self._reg_write(self.EN_RX, self._open_pipes)
 
     @property
     def listen(self):
@@ -768,13 +765,13 @@ class NRF24L01(SPIDevice):
             if self._pipe0_read_addr is not None and self._aa & 1:
                 for i, val in enumerate(self._pipe0_read_addr):
                     self._pipes[0][i] = val
-                self._reg_write_bytes(NRF24L01_REGISTERS.RX_ADDR, self._pipe0_read_addr)
+                self._reg_write_bytes(self.RX_ADDR, self._pipe0_read_addr)
             elif self._pipe0_read_addr is None and self._open_pipes & 1:
                 self._open_pipes &= 0x3E  # close_rx_pipe(0) is slower
-                self._reg_write(NRF24L01_REGISTERS.EN_RX, self._open_pipes)
+                self._reg_write(self.EN_RX, self._open_pipes)
             is_pwr_up = self._config & 2
             self._config = (self._config & 0xFC) | 3
-            self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+            self._reg_write(self.CONFIG, self._config)
             if not is_pwr_up:
                 time.sleep(0.00015)  # mandatory wait to power up radio
             if self._status & 0x70:
@@ -786,9 +783,9 @@ class NRF24L01(SPIDevice):
                 self.flush_tx()
             if self._aa & 1 and not self._open_pipes & 1:
                 self._open_pipes |= 1
-                self._reg_write(NRF24L01_REGISTERS.EN_RX, self._open_pipes)
+                self._reg_write(self.EN_RX, self._open_pipes)
             self._config = self._config & 0xFE | 2
-            self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+            self._reg_write(self.CONFIG, self._config)
             time.sleep(0.00016)
 
     def available(self):
@@ -890,25 +887,25 @@ class NRF24L01(SPIDevice):
     def interrupt_config(self, data_recv=True, data_sent=True, data_fail=True):
         """Sets the configuration of the nRF24L01's IRQ (interrupt) pin (write-only).
         The signal from the nRF24L01's IRQ pin is active LOW."""
-        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG)  # refresh data
+        self._config = self._reg_read(self.CONFIG)  # refresh data
         # save to register and update local copy of pwr & RX/TX modes' flags
         self._config = (self._config & 0x0F) | (not data_fail << 4) | (not data_sent << 5) | \
             (not data_recv << 6)
-        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+        self._reg_write(self.CONFIG, self._config)
 
     def print_details(self, dump_pipes=True):
         """This debuggung function aggregates and outputs all status/condition related information
         from the nRF24L01."""
         observer = self._reg_read(8)
         _fifo = self._reg_read(0x17)
-        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG)
-        self._rf_setup = self._reg_read(NRF24L01_REGISTERS.RF_SETUP)
-        self._retry_setup = self._reg_read(NRF24L01_REGISTERS.SETUP_RETR)
+        self._config = self._reg_read(self.CONFIG)
+        self._rf_setup = self._reg_read(self.RF_SETUP)
+        self._retry_setup = self._reg_read(self.SETUP_RETR)
         self._channel = self.channel
-        self._addr_len = self._reg_read(NRF24L01_REGISTERS.SETUP_AW) + 2
-        self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE)
-        self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
-        self._dyn_pl = self._reg_read(NRF24L01_REGISTERS.DYNPD)
+        self._addr_len = self._reg_read(self.SETUP_AW) + 2
+        self._features = self._reg_read(self.FEATURE)
+        self._aa = self._reg_read(self.EN_AA)
+        self._dyn_pl = self._reg_read(self.DYNPD)
         _crc = (
             (2 if self._config & 4 else 1)
             if self._aa
@@ -1019,14 +1016,14 @@ class NRF24L01(SPIDevice):
             self._dump_pipes()
 
     def _dump_pipes(self):
-        self._open_pipes = self._reg_read(NRF24L01_REGISTERS.EN_RX)
-        self._tx_address = self._reg_read_bytes(NRF24L01_REGISTERS.TX_ADDR)
+        self._open_pipes = self._reg_read(self.EN_RX)
+        self._tx_address = self._reg_read_bytes(self.TX_ADDR)
         for i in range(6):
             if i < 2:
-                self._pipes[i] = self._reg_read_bytes(NRF24L01_REGISTERS.RX_ADDR + i)
+                self._pipes[i] = self._reg_read_bytes(self.RX_ADDR + i)
             else:
-                self._pipes[i] = self._reg_read(NRF24L01_REGISTERS.RX_ADDR + i)
-            self._pl_len[i] = self._reg_read(NRF24L01_REGISTERS.RX_PW + i)
+                self._pipes[i] = self._reg_read(self.RX_ADDR + i)
+            self._pl_len[i] = self._reg_read(self.RX_PW + i)
         print("TX address____________", bytes(self.address()))
         for i in range(6):
             is_open = self._open_pipes & (1 << i)
@@ -1049,33 +1046,33 @@ class NRF24L01(SPIDevice):
     def dynamic_payloads(self):
         """This `bool` attribute controls the nRF24L01's dynamic payload length
         feature."""
-        self._dyn_pl = self._reg_read(NRF24L01_REGISTERS.DYNPD)
+        self._dyn_pl = self._reg_read(self.DYNPD)
         return self._dyn_pl
 
     @dynamic_payloads.setter
     def dynamic_payloads(self, enable):
-        self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE)
+        self._features = self._reg_read(self.FEATURE)
         if isinstance(enable, bool):
             self._dyn_pl = 0x3F if enable else 0
         elif isinstance(enable, int):
             self._dyn_pl = 0x3F & enable
         elif isinstance(enable, (list, tuple)):
-            self._dyn_pl = self._reg_read(NRF24L01_REGISTERS.DYNPD)
+            self._dyn_pl = self._reg_read(self.DYNPD)
             for i, val in enumerate(enable):
                 if i < 6 and val >= 0:  # skip pipe if val is negative
                     self._dyn_pl = (self._dyn_pl & ~(1 << i)) | (bool(val) << i)
         else:
             raise ValueError("dynamic_payloads: {} is an invalid input" % enable)
         self._features = (self._features & 3) | (bool(self._dyn_pl) << 2)
-        self._reg_write(NRF24L01_REGISTERS.FEATURE, self._features)
-        self._reg_write(NRF24L01_REGISTERS.DYNPD, self._dyn_pl)
+        self._reg_write(self.FEATURE, self._features)
+        self._reg_write(self.DYNPD, self._dyn_pl)
 
     def set_dynamic_payloads(self, enable, pipe_number=None):
         """Control the dynamic payload feature for a specific data pipe."""
         if pipe_number is None:
             self.dynamic_payloads = bool(enable)
         elif 0 <= pipe_number <= 5:
-            self._dyn_pl = self._reg_read(NRF24L01_REGISTERS.DYNPD) & ~(1 << pipe_number)
+            self._dyn_pl = self._reg_read(self.DYNPD) & ~(1 << pipe_number)
             self.dynamic_payloads = self._dyn_pl | (bool(enable) << pipe_number)
         else:
             raise IndexError("pipe_number must be in range [0, 5]")
@@ -1101,7 +1098,7 @@ class NRF24L01(SPIDevice):
         for i, val in enumerate(length):
             if i < 6 and val > 0:  # don't throw exception, just skip pipe
                 self._pl_len[i] = min(32, val)
-                self._reg_write(NRF24L01_REGISTERS.RX_PW + i, self._pl_len[i])
+                self._reg_write(self.RX_PW + i, self._pl_len[i])
 
     def set_payload_length(self, length, pipe_number=None):
         """Sets the static payload length feature for each/all data pipes."""
@@ -1109,46 +1106,46 @@ class NRF24L01(SPIDevice):
             self.payload_length = length
         else:
             self._pl_len[pipe_number] = max(1, min(32, length))
-            self._reg_write(NRF24L01_REGISTERS.RX_PW + pipe_number, length)
+            self._reg_write(self.RX_PW + pipe_number, length)
 
     def get_payload_length(self, pipe_number=0):
         """Returns an `int` describing the specified data pipe's static
         payload length."""
-        self._pl_len[pipe_number] = self._reg_read(NRF24L01_REGISTERS.RX_PW + pipe_number)
+        self._pl_len[pipe_number] = self._reg_read(self.RX_PW + pipe_number)
         return self._pl_len[pipe_number]
 
     @property
     def arc(self):
         """This `int` attribute specifies the nRF24L01's number of attempts to re-transmit TX
         payload when acknowledgment packet is not received."""
-        self._retry_setup = self._reg_read(NRF24L01_REGISTERS.SETUP_RETR)
+        self._retry_setup = self._reg_read(self.SETUP_RETR)
         return self._retry_setup & 0x0F
 
     @arc.setter
     def arc(self, count):
         count = max(0, min(int(count), 15))
         self._retry_setup = (self._retry_setup & 0xF0) | count
-        self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
+        self._reg_write(self.SETUP_RETR, self._retry_setup)
 
     @property
     def ard(self):
         """This `int` attribute specifies the nRF24L01's delay (in microseconds) between attempts to
         automatically re-transmit the TX payload when an expected acknowledgement (ACK) packet is
         not received."""
-        self._retry_setup = self._reg_read(NRF24L01_REGISTERS.SETUP_RETR)
+        self._retry_setup = self._reg_read(self.SETUP_RETR)
         return ((self._retry_setup & 0xF0) >> 4) * 250 + 250
 
     @ard.setter
     def ard(self, delta):
         delta = max(250, min(delta, 4000))
         self._retry_setup = (self._retry_setup & 15) | int((delta - 250) / 250) << 4
-        self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
+        self._reg_write(self.SETUP_RETR, self._retry_setup)
 
     def set_auto_retries(self, delay, count):
         """Set the :attr:`ard` & :attr:`arc` attributes with 1 function."""
         delay = int((max(250, min(delay, 4000)) - 250) / 250) << 4
         self._retry_setup = delay | max(0, min(int(count), 15))
-        self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
+        self._reg_write(self.SETUP_RETR, self._retry_setup)
 
     def get_auto_retries(self):
         """Get the :attr:`ard` & :attr:`arc` attributes with 1 function."""
@@ -1163,7 +1160,7 @@ class NRF24L01(SPIDevice):
     def auto_ack(self):
         """This `bool` attribute controls the nRF24L01's automatic acknowledgment
         feature."""
-        self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
+        self._aa = self._reg_read(self.EN_AA)
         return self._aa
 
     @auto_ack.setter
@@ -1173,20 +1170,20 @@ class NRF24L01(SPIDevice):
         elif isinstance(enable, int):
             self._aa = 0x3F & enable
         elif isinstance(enable, (list, tuple)):
-            self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
+            self._aa = self._reg_read(self.EN_AA)
             for i, val in enumerate(enable):
                 if i < 6 and val >= 0:  # skip pipe if val is negative
                     self._aa = (self._aa & ~(1 << i)) | (bool(val) << i)
         else:
             raise ValueError("auto_ack: {} is not a valid input".format(enable))
-        self._reg_write(NRF24L01_REGISTERS.EN_AA, self._aa)
+        self._reg_write(self.EN_AA, self._aa)
 
     def set_auto_ack(self, enable, pipe_number):
         """Control the :attr:`auto_ack` feature for a specific data pipe."""
         if pipe_number is None:
             self.auto_ack = bool(enable)
         elif 0 <= pipe_number <= 5:
-            self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA) & ~(1 << pipe_number)
+            self._aa = self._reg_read(self.EN_AA) & ~(1 << pipe_number)
             self.auto_ack = self._aa | (bool(enable) << pipe_number)
         else:
             raise IndexError("pipe_number must be in range [0, 5]")
@@ -1194,7 +1191,7 @@ class NRF24L01(SPIDevice):
     def get_auto_ack(self, pipe_number):
         """Returns a `bool` describing the :attr:`auto_ack` feature about a data pipe."""
         if 0 <= pipe_number <= 5:
-            self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
+            self._aa = self._reg_read(self.EN_AA)
             return bool(self._aa & (1 << pipe_number))
         raise IndexError("pipe_number must be in range [0, 5]")
 
@@ -1202,9 +1199,9 @@ class NRF24L01(SPIDevice):
     def ack(self):
         """This `bool` attribute represents the status of the nRF24L01's capability to use custom
         payloads as part of the automatic acknowledgment (ACK) packet."""
-        self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
-        self._dyn_pl = self._reg_read(NRF24L01_REGISTERS.DYNPD)
-        self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE)
+        self._aa = self._reg_read(self.EN_AA)
+        self._dyn_pl = self._reg_read(self.DYNPD)
+        self._features = self._reg_read(self.FEATURE)
         return bool((self._features & 6) == 6 and ((self._aa & self._dyn_pl) & 1))
 
     @ack.setter
@@ -1212,10 +1209,10 @@ class NRF24L01(SPIDevice):
         if bool(enable):
             self.set_auto_ack(True, 0)
             self._dyn_pl = self._dyn_pl & 0x3E | 1
-            self._reg_write(NRF24L01_REGISTERS.DYNPD, self._dyn_pl)
+            self._reg_write(self.DYNPD, self._dyn_pl)
             self._features = self._features | 4
         self._features = self._features & 5 | bool(enable) << 1
-        self._reg_write(NRF24L01_REGISTERS.FEATURE, self._features)
+        self._reg_write(self.FEATURE, self._features)
 
     def load_ack(self, buf, pipe_number):
         """This allows the MCU to specify an ACK payload to be allocated into the TX FIFO buffer for use
@@ -1234,19 +1231,19 @@ class NRF24L01(SPIDevice):
     @property
     def allow_ask_no_ack(self):
         """Allow or disable ``ask_no_ack`` parameter to :meth:`send()` & :meth:`write()`."""
-        self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE)
+        self._features = self._reg_read(self.FEATURE)
         return bool(self._features & 1)
 
     @allow_ask_no_ack.setter
     def allow_ask_no_ack(self, enable):
-        self._features = self._reg_read(NRF24L01_REGISTERS.FEATURE) & 6 | bool(enable)
-        self._reg_write(NRF24L01_REGISTERS.FEATURE, self._features)
+        self._features = self._reg_read(self.FEATURE) & 6 | bool(enable)
+        self._reg_write(self.FEATURE, self._features)
 
     @property
     def data_rate(self):
         """This `int` attribute specifies the nRF24L01's frequency data rate for OTA (over the air)
         transmissions."""
-        self._rf_setup = self._reg_read(NRF24L01_REGISTERS.RF_SETUP)
+        self._rf_setup = self._reg_read(self.RF_SETUP)
         rf_setup = self._rf_setup & 0x28
         return (2 if rf_setup == 8 else 250) if rf_setup else 1
 
@@ -1260,28 +1257,28 @@ class NRF24L01(SPIDevice):
                 "variants of the nRF24L01 transceivers."
             )
         speed = 0 if speed == 1 else (0x20 if speed != 2 else 8)
-        self._rf_setup = self._reg_read(NRF24L01_REGISTERS.SETUP_RETR) & 0xD7 | speed
-        self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._rf_setup)
+        self._rf_setup = self._reg_read(self.SETUP_RETR) & 0xD7 | speed
+        self._reg_write(self.SETUP_RETR, self._rf_setup)
 
     @property
     def channel(self):
         """This `int` attribute specifies the nRF24L01's frequency (in 2400 +
         `channel` MHz)."""
-        return self._reg_read(NRF24L01_REGISTERS.RF_CH)
+        return self._reg_read(self.RF_CH)
 
     @channel.setter
     def channel(self, channel):
         if not 0 <= int(channel) <= 125:
             raise ValueError("channel can only be set in range [0, 125]")
         self._channel = channel
-        self._reg_write(NRF24L01_REGISTERS.RF_CH, channel)  # always writes to reg
+        self._reg_write(self.RF_CH, channel)  # always writes to reg
 
     @property
     def crc(self):
         """This `int` attribute specifies the nRF24L01's CRC (cyclic redundancy checking) encoding
         scheme in terms of byte length."""
-        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG)
-        self._aa = self._reg_read(NRF24L01_REGISTERS.EN_AA)
+        self._config = self._reg_read(self.CONFIG)
+        self._aa = self._reg_read(self.EN_AA)
         if self._aa:
             return 2 if self._config & 4 else 1
         return max(0, ((self._config & 0x0C) >> 2) - 1)
@@ -1291,25 +1288,25 @@ class NRF24L01(SPIDevice):
         length = min(2, abs(int(length)))
         length = (length + 1) << 2 if length else 0
         self._config = self._config & 0x73 | length
-        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+        self._reg_write(self.CONFIG, self._config)
 
     @property
     def power(self):
         """This `bool` attribute controls the power state of the nRF24L01."""
-        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG)
+        self._config = self._reg_read(self.CONFIG)
         return bool(self._config & 2)
 
     @power.setter
     def power(self, is_on):
-        self._config = self._reg_read(NRF24L01_REGISTERS.CONFIG) & 0x7D | bool(is_on) << 1
-        self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+        self._config = self._reg_read(self.CONFIG) & 0x7D | bool(is_on) << 1
+        self._reg_write(self.CONFIG, self._config)
         time.sleep(0.00016)
 
     @property
     def pa_level(self):
         """This `int` attribute specifies the nRF24L01's power amplifier level (in
         dBm)."""
-        self._rf_setup = self._reg_read(NRF24L01_REGISTERS.RF_SETUP)
+        self._rf_setup = self._reg_read(self.RF_SETUP)
         return (3 - ((self._rf_setup & 0x06) >> 1)) * -6
 
     @pa_level.setter
@@ -1321,12 +1318,12 @@ class NRF24L01(SPIDevice):
             raise ValueError("pa_level must be -18, -12, -6, or 0 (in dBm)")
         power = (3 - int(power / -6)) * 2
         self._rf_setup = (self._rf_setup & 0xF8) | power | lna_bit
-        self._reg_write(NRF24L01_REGISTERS.RF_SETUP, self._rf_setup)
+        self._reg_write(self.RF_SETUP, self._rf_setup)
 
     @property
     def is_lna_enabled(self):
         """A read-only `bool` attribute about the LNA gain feature."""
-        self._rf_setup = self._reg_read(NRF24L01_REGISTERS.RF_SETUP)
+        self._rf_setup = self._reg_read(self.RF_SETUP)
         return bool(self._rf_setup & 1)
 
     def resend(self, send_only=False):
@@ -1365,7 +1362,7 @@ class NRF24L01(SPIDevice):
         is_power_up = self._config & 2
         if self._config & 3 != 2:  # is radio powered up in TX mode?
             self._config = (self._config & 0x7C) | 2
-            self._reg_write(NRF24L01_REGISTERS.CONFIG, self._config)
+            self._reg_write(self.CONFIG, self._config)
             if not is_power_up:
                 time.sleep(0.00016)
         if not bool((self._dyn_pl & 1) and (self._features & 4)):
@@ -1375,7 +1372,7 @@ class NRF24L01(SPIDevice):
                 buf = buf[: self._pl_len[0]]
         if ask_no_ack and self._features & 1 == 0:
             self._features = self._features & 0xFE | 1
-            self._reg_write(NRF24L01_REGISTERS.FEATURE, self._features)
+            self._reg_write(self.FEATURE, self._features)
         self._reg_write_bytes(0xA0 | (bool(ask_no_ack) << 4), buf)
         if not write_only:
             self.ce_pin.value = 1
@@ -1421,13 +1418,13 @@ class NRF24L01(SPIDevice):
         self.power = 1
         self.listen = 0
         self._rf_setup |= 0x90
-        self._reg_write(NRF24L01_REGISTERS.RF_SETUP, self._rf_setup)
+        self._reg_write(self.RF_SETUP, self._rf_setup)
         if not self.is_plus_variant:
             self.auto_ack = False
             self._retry_setup = 0
-            self._reg_write(NRF24L01_REGISTERS.SETUP_RETR, self._retry_setup)
+            self._reg_write(self.SETUP_RETR, self._retry_setup)
             self._tx_address = bytearray([0xFF] * 5)
-            self._reg_write_bytes(NRF24L01_REGISTERS.TX_ADDR, self._tx_address)
+            self._reg_write_bytes(self.TX_ADDR, self._tx_address)
             self._reg_write_bytes(0xA0, b"\xFF" * 32)
             self.crc = 0
             self.ce_pin.value = 1
@@ -1442,4 +1439,4 @@ class NRF24L01(SPIDevice):
         self.ce_pin.value = 0
         self.power = 0
         self._rf_setup &= ~0x90
-        self._reg_write(NRF24L01_REGISTERS.RF_SETUP, self._rf_setup)
+        self._reg_write(self.RF_SETUP, self._rf_setup)
