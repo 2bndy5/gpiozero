@@ -1027,6 +1027,7 @@ class NRF24L01(SPIDevice):
         # perform non-operation to get status byte
         # should be faster than reading the STATUS register
         self._reg_write(0xFF)
+        return True
 
     @property
     def pipe(self):
@@ -1332,14 +1333,14 @@ class NRF24L01(SPIDevice):
             else:
                 self._pipes[i] = self._reg_read(NRF24L01_REGISTERS.RX_ADDR + i)
             self._pl_len[i] = self._reg_read(NRF24L01_REGISTERS.RX_PW + i)
-        print("TX address____________ 0x" + repr(self.address()))
+        print("TX address____________", bytes(self.address()))
         for i in range(6):
             is_open = self._open_pipes & (1 << i)
             print(
                 "Pipe {} ({}) bound: {}".format(
                     i,
                     " open " if is_open else "closed",
-                    "0x" + repr(self.address(i)),
+                    bytes(self.address(i)),
                 )
             )
             if is_open and not self._dyn_pl & (1 << i):
