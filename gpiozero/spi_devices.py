@@ -619,8 +619,6 @@ class NRF24L01(SPIDevice):
         self._rf_setup = 0x07  # 1 Mbps data_rate, and 0 dbm pa_level
         # pre-configure dynamic_payloads & auto_ack
         self._dyn_pl, self._aa = (0x3F,) * 2  # 0x3F = enable feature on all pipes
-        self._channel = 76  # 2.476 GHz
-        self._addr_len = 5  # 5-byte long addresses
         self._pl_len = [32] * 6  # 32-byte static payloads for all pipes
 
         self.ce_pin.value = 0  # ensure standby-I mode to write to CONFIG register
@@ -639,8 +637,8 @@ class NRF24L01(SPIDevice):
                 self._reg_write(self.RX_ADDR + i, addr)
             self.set_payload_length(self._pl_len[i], i)
         self._reg_write_bytes(self.TX_ADDR, self._tx_address)
-        self._reg_write(self.RF_CH, self._channel)
-        self._reg_write(self.SETUP_AW, self._addr_len - 2)
+        self._reg_write(self.RF_CH, 76)
+        self._reg_write(self.SETUP_AW, 3)
         self.flush_rx()
         self.flush_tx()
         self.clear_status_flags()
@@ -701,15 +699,13 @@ class NRF24L01(SPIDevice):
     @property
     def address_length(self):
         """This `int` attribute specifies the length (in bytes) of addresses."""
-        self._addr_len = self._reg_read(self.SETUP_AW) + 2
-        return self._addr_len
+        return self._reg_read(self.SETUP_AW) + 2
 
     @address_length.setter
     def address_length(self, length):
         if not 3 <= length <= 5:
             raise ValueError("address_length can only be set in range [3, 5] bytes")
-        self._addr_len = int(length)
-        self._reg_write(self.SETUP_AW, length - 2)
+        self._reg_write(self.SETUP_AW, int(length))
 
     def open_tx_pipe(self, address):
         """This function is used to open a data pipe for OTA (over the air) TX
@@ -897,42 +893,42 @@ class NRF24L01(SPIDevice):
         """This debuggung function aggregates and outputs all status/condition related information
         from the nRF24L01."""
         observer = self._reg_read(8)
-        _fifo = self._reg_read(0x17)
+        fifo = self._reg_read(0x17)
         self._config = self._reg_read(self.CONFIG)
         self._rf_setup = self._reg_read(self.RF_SETUP)
         self._retry_setup = self._reg_read(self.SETUP_RETR)
-        self._channel = self.channel
-        self._addr_len = self._reg_read(self.SETUP_AW) + 2
+        channel = self.channel
+        addr_len = self._reg_read(self.SETUP_AW) + 2
         self._features = self._reg_read(self.FEATURE)
         self._aa = self._reg_read(self.EN_AA)
         self._dyn_pl = self._reg_read(self.DYNPD)
-        _crc = (
+        crc = (
             (2 if self._config & 4 else 1)
             if self._aa
             else max(0, ((self._config & 0x0C) >> 2) - 1)
         )
         d_rate = self._rf_setup & 0x28
         d_rate = (2 if d_rate == 8 else 250) if d_rate else 1
-        _pa_level = (3 - ((self._rf_setup & 6) >> 1)) * -6
+        pa_level = (3 - ((self._rf_setup & 6) >> 1)) * -6
 
         print("Is a plus variant_________{}".format(self.is_plus_variant))
         print(
             "Channel___________________{} ~ {} GHz".format(
-                self._channel, (self._channel + 2400) / 1000
+                channel, (channel + 2400) / 1000
             )
         )
         print(
             "RF Data Rate______________{}".format(d_rate),
             "Mbps" if d_rate != 250 else "Kbps",
         )
-        print("RF Power Amplifier________{} dbm".format(_pa_level))
+        print("RF Power Amplifier________{} dbm".format(pa_level))
         print(
             "RF Low Noise Amplifier____{}".format(
                 "Enabled" if bool(self._rf_setup & 1) else "Disabled"
             )
         )
-        print("CRC bytes_________________{}".format(_crc))
-        print("Address length____________{} bytes".format(self._addr_len))
+        print("CRC bytes_________________{}".format(crc))
+        print("Address length____________{} bytes".format(addr_len))
         print("TX Payload lengths________{} bytes".format(self._pl_len[0]))
         print(
             "Auto retry delay__________{} microseconds".format(
@@ -940,7 +936,7 @@ class NRF24L01(SPIDevice):
             )
         )
         print("Auto retry attempts_______{} maximum".format(self._rf_setup & 0x0F))
-        print("Re-use TX FIFO____________{}".format(bool(_fifo & 64)))
+        print("Re-use TX FIFO____________{}".format(bool(fifo & 64)))
         print(
             "Packets lost on current channel_____________________{}".format(
                 observer >> 4
@@ -968,14 +964,14 @@ class NRF24L01(SPIDevice):
         )
         print(
             "TX FIFO full__________{}    TX FIFO empty________{}".format(
-                "_True" if _fifo & 0x20 else "False",
-                "True" if _fifo & 0x10 else "False",
+                "_True" if fifo & 0x20 else "False",
+                "True" if fifo & 0x10 else "False",
             )
         )
         print(
             "RX FIFO full__________{}    RX FIFO empty________{}".format(
-                "_True" if _fifo & 2 else "False",
-                "True" if _fifo & 1 else "False",
+                "_True" if fifo & 2 else "False",
+                "True" if fifo & 1 else "False",
             )
         )
         print(
@@ -1270,8 +1266,7 @@ class NRF24L01(SPIDevice):
     def channel(self, channel):
         if not 0 <= int(channel) <= 125:
             raise ValueError("channel can only be set in range [0, 125]")
-        self._channel = channel
-        self._reg_write(self.RF_CH, channel)  # always writes to reg
+        self._reg_write(self.RF_CH, channel)
 
     @property
     def crc(self):
